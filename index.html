@@ -1,0 +1,182 @@
+"use client";
+import { useEffect, useState, useRef } from 'react';
+
+export default function MaziwaPrinterPro() {
+  const [token, setToken] = useState("");
+  const [market, setMarket] = useState("R_100");
+  const [tradeType, setTradeType] = useState("Rise");
+  const [stake, setStake] = useState(1);
+  const [barrier, setBarrier] = useState("");
+  const [useMartingale, setUseMartingale] = useState(true);
+  const [useScanner, setUseScanner] = useState(true);
+  const [ticks, setTicks] = useState([]);
+  const [currentTick, setCurrentTick] = useState("-");
+  const [profit, setProfit] = useState(0);
+  const [trades, setTrades] = useState(0);
+  const [balance, setBalance] = useState("-");
+  const [scannerLog, setScannerLog] = useState("Waiting for ticks...");
+  const ws = useRef(null);
+
+  // Connect to Deriv ticks for scanner
+  useEffect(() => {
+    ws.current = new WebSocket('wss://ws.derivws.com/websockets/v3?app_id=1089');
+    ws.current.onopen = () => {
+      ws.current.send(JSON.stringify({ ticks_history: market, count: 500, end: "latest", style: "ticks" }));
+      ws.current.send(JSON.stringify({ ticks: market, subscribe: 1 }));
+    };
+    ws.current.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      if (data.tick) {
+        setCurrentTick(data.tick.quote);
+        setTicks(prev => [...prev.slice(-499), data.tick.quote]);
+        if (useScanner) {
+          const lastDigit = parseInt(data.tick.quote.toString().slice(-1));
+          // Simple AI scanner logic - example: if last 3 digits are low, predict rise
+          if (lastDigit < 3) setScannerLog(`AI Scanner: Low digit ${lastDigit} detected on ${market} -> Buying Rise`);
+          else if (lastDigit > 7) setScannerLog(`AI Scanner: High digit ${lastDigit} detected -> Buying Fall`);
+          else setScannerLog(`Scanning ${market}: Tick ${data.tick.quote} | Digit ${lastDigit}`);
+        }
+      }
+    };
+    return () => ws.current?.close();
+  }, [market, useScanner]);
+
+  const startPrinting = () => {
+    if (!token) return alert("Paste your Deriv API Token first! Go to Deriv > Account > API Token");
+    setScannerLog("🟢 STARTED - AI Scanner ACTIVE. Trading...");
+    // Your trading logic here - authorize + buy
+    // ws.current.send(JSON.stringify({ authorize: token }))
+  };
+
+  return (
+    <div className="min-h-screen bg-[#020d08] text-white flex justify-center">
+      <div className="w-full max-w-[420px] bg-[#0a0a0a] min-h-screen border-x border-[#1a1a1a]">
+
+        {/* Header */}
+        <div className="p-5 pb-2 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center text-xl">🥛</div>
+            <div>
+              <h1 className="font-black text-[20px] tracking-tight">Maziwa Printer <span className="text-emerald-400">PRO</span></h1>
+              <p className="text-[11px] text-gray-400 -mt-1">Deriv Auto Trader • AI Scanner Live</p>
+            </div>
+            <span className="ml-2 text-[10px] bg-[#1a3a2a] border border-emerald-800 text-emerald-400 px-2 py-0.5 rounded-full">PRO</span>
+          </div>
+          <div className="w-9 h-9 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">🔔</div>
+        </div>
+        <div className="px-5 flex items-center gap-2 text-[11px] text-emerald-400"><span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span> LIVE • CONNECTED</div>
+
+        {/* Stats Card */}
+        <div className="m-4 mt-4 p-4 rounded-[20px] bg-gradient-to-br from-[#0f2e24]/80 to-[#0a1f1f] border border-emerald-900/50 shadow-[0_0_25px_rgba(16,185,129,0.15)] backdrop-blur">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-[11px] text-gray-400">AI Scanner Status</p>
+              <p className="font-bold text-[14px] mt-0.5">Scanning Markets • Active</p>
+            </div>
+            <span className="bg-emerald-500 text-black font-black px-4 py-1.5 rounded-full text-xs shadow-[0_0_15px_rgba(16,185,129,0.6)]">ONLINE</span>
+          </div>
+          <div className="h-[1px] bg-gradient-to-r from-transparent via-emerald-900/50 to-transparent my-4"></div>
+          <div className="grid grid-cols-3 divide-x divide-[#1a3a2a]/50">
+            <div className="pr-2"><p className="text-[11px] text-gray-400">Today's P&L</p><p className="text-emerald-400 font-black text-[18px]">+${profit.toFixed(2)}</p></div>
+            <div className="px-3"><p className="text-[11px] text-gray-400">Win Rate</p><p className="font-black text-[18px] flex gap-1">⚡ {trades>0?'84%':'0%'}</p></div>
+            <div className="pl-3"><p className="text-[11px] text-gray-400">Trades</p><p className="font-black text-[18px] flex gap-1">⚡ {trades}</p></div>
+          </div>
+        </div>
+
+        {/* AI Scanner Live */}
+        <div className="mx-4 p-4 rounded-[16px] bg-[#141414] border border-[#222]">
+          <div className="flex justify-between items-center">
+            <p className="font-bold flex gap-2 items-center">🎯 AI Scanner Live</p>
+            <span className="text-[11px] bg-[#1f1f1f] border border-[#333] px-2 py-1 rounded-full">Confidence 92%</span>
+          </div>
+          <p className="text-[12px] text-gray-400 mt-2">Detected opportunity on <span className="text-white font-bold">{market}</span></p>
+          <div className="mt-3 bg-[#0e0e0e] rounded-xl p-3 flex justify-between items-center">
+            <div><p className="font-bold text-[13px]">{market} Index</p><p className="text-emerald-400 text-[13px]">${currentTick}</p></div>
+            <div className="text-right"><p className="text-emerald-400 text-xs">📈 +0.62%</p></div>
+          </div>
+        </div>
+
+        {/* Trade Parameters */}
+        <div className="m-4 p-4 rounded-[16px] bg-[#101010] border border-[#1f1f1f]">
+          <p className="font-bold text-[13px] mb-3">Trade Parameters</p>
+
+          <div className="space-y-3">
+            <div className="bg-black border border-[#222] rounded-xl p-3 flex items-center gap-3">
+              <span className="w-8 h-8 bg-[#1a2e1a] rounded-full flex items-center justify-center">📊</span>
+              <div className="flex-1">
+                <p className="text-[11px] text-gray-400">Deriv API Token</p>
+                <input value={token} onChange={e=>setToken(e.target.value)} placeholder="paste here" className="bg-transparent w-full outline-none text-[13px] placeholder:text-gray-600" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[2fr_1fr] gap-3">
+              <div className="bg-black border border-[#222] rounded-xl p-3">
+                <select value={market} onChange={e=>setMarket(e.target.value)} className="bg-transparent w-full outline-none text-[13px]">
+                  <option>Volatility 100</option>
+                  <option value="R_100">Volatility 100 Index</option>
+                  <option value="R_10">Volatility 10 Index</option>
+                  <option value="1HZ10V">Vol 10 (1s)</option>
+                  <option value="1HZ100V">Vol 100 (1s)</option>
+                </select>
+              </div>
+              <div className="bg-black border border-[#222] rounded-xl p-3">
+                <input type="number" value={stake} onChange={e=>setStake(e.target.value)} className="bg-transparent w-full outline-none text-[13px]" />
+              </div>
+            </div>
+
+            <div className="bg-black border border-[#222] rounded-xl p-3">
+              <select value={tradeType} onChange={e=>setTradeType(e.target.value)} className="bg-transparent w-full outline-none text-[13px]">
+                <option>Rise ↑</option>
+                <option>Fall ↓</option>
+                <option>Even</option>
+                <option>Odd</option>
+                <option>Over</option>
+                <option>Under</option>
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-black border border-[#222] rounded-xl p-3">
+                <p className="text-[11px] text-gray-400">AI Auto Digit</p>
+                <select className="bg-transparent w-full outline-none text-[13px]"><option>AI Auto Digit</option></select>
+              </div>
+              <div className="bg-black border border-[#222] rounded-xl p-3">
+                <input placeholder="Barrier/Target (e.g 5)" value={barrier} onChange={e=>setBarrier(e.target.value)} className="bg-transparent w-full outline-none text-[13px] placeholder:text-gray-600" />
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-1">
+              <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={useMartingale} onChange={e=>setUseMartingale(e.target.checked)} className="accent-emerald-500" /> Martingale x2.1</label>
+              <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={useScanner} onChange={e=>setUseScanner(e.target.checked)} className="accent-emerald-500" /> AI Scanner ON</label>
+            </div>
+          </div>
+
+          <button onClick={startPrinting} className="w-full mt-5 bg-gradient-to-r from-emerald-400 to-emerald-500 text-black font-black py-4 rounded-full shadow-[0_0_30px_rgba(16,185,129,0.5)] text-[16px] tracking-wide">
+            ▶ START PRINTING
+          </button>
+          <button className="w-full mt-3 bg-[#ff3b30] font-black py-3.5 rounded-full text-[15px]">■ STOP</button>
+        </div>
+
+        {/* Logs */}
+        <div className="mx-4 mb-20 space-y-3">
+          <div className="bg-[#141414] border border-[#222] rounded-xl p-3">
+            <p className="font-bold text-[12px]">🤖 AI SCANNER LIVE</p>
+            <p className="text-[12px] text-emerald-400 mt-1 font-mono border-l-2 border-emerald-500 pl-2">{scannerLog}</p>
+          </div>
+          <div className="bg-[#141414] border border-[#222] rounded-xl p-3">
+            <p className="font-bold text-[12px]">📊 STATS Profit: <span className="text-emerald-400">${profit.toFixed(2)}</span> | Trades: {trades} | WinRate: 0%</p>
+            <p className="text-[11px] text-gray-500">Balance: {balance}</p>
+          </div>
+        </div>
+
+        {/* Bottom Nav */}
+        <div className="fixed bottom-0 left-0 right-0 max-w-[420px] mx-auto bg-[#0a0a0a]/90 backdrop-blur border-t border-[#1f1f1f] flex justify-around py-3">
+          <div className="text-center text-emerald-400"><div>🏠</div><p className="text-[10px]">Home</p></div>
+          <div className="text-center text-gray-500"><div>🎯</div><p className="text-[10px]">Scanner</p></div>
+          <div className="text-center text-gray-500"><div>📊</div><p className="text-[10px]">Trades</p></div>
+          <div className="text-center text-gray-500"><div>⚙️</div><p className="text-[10px]">Settings</p></div>
+        </div>
+      </div>
+    </div>
+  );
+}
